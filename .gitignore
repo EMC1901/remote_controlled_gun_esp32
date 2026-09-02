@@ -1,0 +1,36 @@
+# Local project materials that are not part of the distributable PC client
+/picture/
+/实施图片/
+/实时记录.md
+/esp32_*/
+
+# Runtime and build artifacts
+/controller_web/node_modules/
+/controller_web/.venv/
+/controller_web/.next/
+/controller_web/.vinext/
+/controller_web/dist/
+/controller_web/logs/
+/controller_web/.wrangler/
+/controller_web/.controller-pids.json
+/controller_web/bridge/__pycache__/
+*.pyc
+
+# Local starter files not used by the released controller
+/controller_web/.oxfmtrc.json
+/controller_web/.oxlintrc.json
+/controller_web/README.md
+/controller_web/components.json
+/controller_web/hooks/
+/controller_web/components/ui/*
+!/controller_web/components/ui/alert-dialog.tsx
+!/controller_web/components/ui/badge.tsx
+!/controller_web/components/ui/button.tsx
+!/controller_web/components/ui/card.tsx
+
+# Local environment and editor files
+.env*
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
