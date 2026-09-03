@@ -1,0 +1,14 @@
+[Unit]
+Description=ESP32 Gun Bluetooth RFCOMM binding
+After=bluetooth.service
+Requires=bluetooth.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/rfcomm connect 0 70:4B:CA:6F:42:7A 1
+ExecStop=/usr/bin/rfcomm release 0
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

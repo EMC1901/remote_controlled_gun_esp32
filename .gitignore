@@ -13,6 +13,7 @@
 /controller_web/logs/
 /controller_web/.wrangler/
 /controller_web/.controller-pids.json
+/controller_web/.dog-controller-pids.json
 /controller_web/bridge/__pycache__/
 *.pyc
 
@@ -34,3 +35,12 @@
 Thumbs.db
 .vscode/
 .idea/
+
+# SSH credentials must stay on the local computer
+.ssh/
+*.pem
+*.key
+*.ppk
+id_ed25519*
+id_rsa*
+esp32_gun_cas_m8s*

@@ -1,0 +1,17 @@
+[Unit]
+Description=ESP32 Gun local Bluetooth bridge
+After=esp32-gun-rfcomm.service
+Requires=esp32-gun-rfcomm.service
+
+[Service]
+Type=simple
+User=cas
+Group=cas
+SupplementaryGroups=dialout
+WorkingDirectory=/home/cas/esp32-gun-controller
+ExecStart=/usr/bin/python3 /home/cas/esp32-gun-controller/server.py --port /dev/rfcomm0 --listen 18765
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
