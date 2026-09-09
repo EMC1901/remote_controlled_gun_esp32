@@ -1,10 +1,12 @@
 # ESP32 玩具遥控枪网页控制台
 
-通过 Windows 电脑上的网页控制已配置好的 ESP32 玩具设备，支持两种连接方式：电脑直接通过经典蓝牙 SPP 连接 ESP32，或通过 SSH 隧道让机械狗服务器承担蓝牙连接。
+通过 Windows 电脑上的网页控制已配置好的 ESP32 玩具设备，支持电脑蓝牙直连，或通过 SSH 隧道访问机械狗服务器上的 USB/蓝牙桥。
+
+**机械狗有线模式保持原来的网页地址和双击启停方式。** USB 模式需要兼容的 USB 串口固件，不能直接用只接收蓝牙命令的旧固件。配置和回退说明见 [USB 有线模式](controller_web/linux/USB.md)。
 
 网页始终运行在电脑的 [http://localhost:3000](http://localhost:3000)。机械狗模式不需要电脑连接 ESP32 蓝牙，也不需要在机械狗服务器上运行 Node.js。
 
-本仓库包含网页、Python 蓝牙桥、Windows 启停脚本及 Linux systemd 服务文件，**不包含 ESP32 固件、硬件接线资料、SSH 私钥或密码**。使用前，ESP32 必须已经配置兼容协议并广播 `ESP32-Gun-SPP`；下载本仓库不会自动烧录或配置 ESP32。
+本仓库包含网页、Python 串口桥、Windows 启停脚本、Linux systemd/udev 配置，以及 USB 模式的 ESP32 `.ino` 源码。**不包含硬件接线资料、编译产物、完整 Flash 备份、SSH 私钥或密码。** USB 模式需要烧录仓库内的有线固件；旧版蓝牙模式要求 ESP32 已配置兼容固件并广播 `ESP32-Gun-SPP`。
 
 ## 日常使用
 
@@ -15,7 +17,7 @@
 | 通过机械狗服务器 | [启动机械狗控制台.bat](controller_web/启动机械狗控制台.bat) | [关闭机械狗控制台.bat](controller_web/关闭机械狗控制台.bat) |
 | 电脑直接连接 ESP32 蓝牙 | [启动控制台.bat](controller_web/启动控制台.bat) | [关闭控制台.bat](controller_web/关闭控制台.bat) |
 
-启动后浏览器自动打开，页面显示“蓝牙在线”才表示设备可通信。关闭脚本会尝试先发送 `STOP`，再关闭对应的本机后台进程。**仅关闭浏览器标签页不会退出后台服务。**
+启动后浏览器自动打开，页面显示“设备在线”，通信类型显示“USB 串口”或“经典蓝牙 SPP”。关闭脚本会尝试先发送 `STOP`，再关闭对应的本机后台进程。**仅关闭浏览器标签页不会退出后台服务。**
 
 两种模式都使用本机端口 3000 和 8765，不要同时运行。切换前先使用原模式的关闭脚本；机械狗启动脚本也会清理本项目的直连模式进程。
 
@@ -43,11 +45,11 @@ Windows 浏览器：http://localhost:3000
   本机 Python 桥     SSH 本地端口转发
        │                │
   Windows COM 口    服务器 127.0.0.1:18765
-       │            Python 桥 → /dev/rfcomm0
+       │            Python 桥 → USB 串口（或旧版 RFCOMM）
        │                │
        └───────┬────────┘
                ▼
-       经典蓝牙 ESP32-Gun-SPP
+       ESP32（对应 USB 或蓝牙固件）
 ```
 
 ## 公共准备：下载与安装网页依赖
@@ -67,9 +69,12 @@ npm ci
 ### 1. 确认服务器准备完成
 
 - 电脑能访问机械狗的 SSH 服务，当前脚本目标为 `cas@10.42.0.1`。
-- 机械狗具备经典蓝牙能力，并已配对、信任 `ESP32-Gun-SPP`。
-- 服务器已部署本项目 Python 桥，且 `esp32-gun-rfcomm.service` 和 `esp32-gun-bridge.service` 正常运行。
-- 服务器上的桥接地址为 `127.0.0.1:18765`。首次部署见 [Linux 服务部署说明](controller_web/linux/README.md)。
+- USB 模式：数据线连接机械狗与 ESP32，加载 USB 固件、USB 服务配置，并停用 RFCOMM 服务。
+- 旧版蓝牙模式：机械狗已配对、信任 `ESP32-Gun-SPP`，RFCOMM 服务正常运行；USB 专用固件不接受蓝牙控制。
+- 两种模式都要求 `esp32-gun-bridge.service` 正常运行。
+- 服务器上的桥接地址为 `127.0.0.1:18765`。有线部署见 [USB 配置说明](controller_web/linux/USB.md)，旧版蓝牙部署见 [Linux 服务部署说明](controller_web/linux/README.md)。
+
+USB 模式固件源码位于 [esp32_usb_ch1_ch2_position_control.ino](esp32_usb_ch1_ch2_position_control/esp32_usb_ch1_ch2_position_control.ino)。必须先断开枪体电池和发射电机，再按 [USB 有线模式说明](controller_web/linux/USB.md)完成编译、备份、烧录与服务器配置；不要把本项目的固件或完整 Flash 备份写入其他设备。
 
 这一模式只要求 Windows 安装 OpenSSH 客户端和 Node.js；电脑不需要 Python 或蓝牙串口。
 

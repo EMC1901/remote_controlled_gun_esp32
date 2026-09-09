@@ -3,6 +3,9 @@
 /实施图片/
 /实时记录.md
 /esp32_*/
+!/esp32_usb_ch1_ch2_position_control/
+/esp32_usb_ch1_ch2_position_control/*
+!/esp32_usb_ch1_ch2_position_control/*.ino
 
 # Runtime and build artifacts
 /controller_web/node_modules/

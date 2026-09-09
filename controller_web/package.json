@@ -1,7 +1,7 @@
 {
   "name": "remote-controlled-gun-esp32",
   "version": "0.1.0",
-  "description": "Windows local web controller for a preconfigured ESP32 toy launcher over Bluetooth Classic SPP.",
+  "description": "Windows local web controller for a preconfigured ESP32 toy device over Bluetooth Classic SPP or a mechanical-dog server USB bridge.",
   "private": true,
   "engines": {
     "node": ">=22.13.0"

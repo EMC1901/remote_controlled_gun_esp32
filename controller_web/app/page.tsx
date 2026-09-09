@@ -7,6 +7,7 @@ import {
   ArrowRight,
   ArrowUp,
   Bluetooth,
+  Cable,
   CircleStop,
   Crosshair,
   LockKeyhole,
@@ -73,7 +74,9 @@ export default function Home() {
   const [safetyDialogOpen, setSafetyDialogOpen] = useState(false);
   const [holding, setHolding] = useState<Direction | null>(null);
   const [status, setStatus] = useState<DeviceStatus | null>(null);
-  const [message, setMessage] = useState('正在检查蓝牙连接…');
+  const [message, setMessage] = useState('正在检查设备连接…');
+  const isUsb = status?.transport === 'usb_serial';
+  const transportLabel = status ? (isUsb ? 'USB 串口' : '经典蓝牙 SPP') : '等待设备连接';
   const [lastCommand, setLastCommand] = useState('尚未发送控制命令');
   const holdGeneration = useRef(0);
   const holdTimer = useRef<number | null>(null);
@@ -125,12 +128,15 @@ export default function Home() {
       const response = await fetch(`${API_BASE}/api/status`, { cache: 'no-store' });
       const payload = await response.json();
       if (!response.ok || !payload.ok) {
-        throw new Error(payload.error ?? '蓝牙状态查询失败');
+        throw new Error(payload.error ?? '设备状态查询失败');
       }
       setStatus(payload.device);
       setOnline(true);
       if (!holdingRef.current && !fireHoldingRef.current && !armedRef.current) {
-        setMessage('蓝牙已连接，控制输出处于安全状态');
+        const stopped = payload.device.ch1_motion === 'stopped'
+          && payload.device.ch2_motion === 'stopped'
+          && payload.device.fire_active === false;
+        setMessage(stopped ? '设备已连接，设备报告已停止、未发射' : '设备已连接，请检查当前输出状态');
       }
     } catch (error) {
       setOnline(false);
@@ -438,9 +444,12 @@ export default function Home() {
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant={online ? 'default' : 'destructive'} className="h-7 px-3">
               <span className={`size-2 rounded-full ${online ? 'bg-emerald-300' : 'bg-red-400'}`} />
-              {online ? '蓝牙在线' : '蓝牙离线'}
+              {online ? '设备在线' : '设备离线'}
             </Badge>
-            <Badge variant="outline" className="h-7 px-3"><Bluetooth data-icon="inline-start" /> Bluetooth · SPP</Badge>
+            <Badge variant="outline" className="h-7 px-3">
+              {isUsb ? <Cable data-icon="inline-start" /> : <Bluetooth data-icon="inline-start" />}
+              {transportLabel}
+            </Badge>
           </div>
         </header>
 
@@ -500,7 +509,7 @@ export default function Home() {
                 <CardDescription>断连、页面失焦或心跳超时会停止改变目标，并保持当前位置。</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                <StatusRow label="通信" value={online ? '经典蓝牙 SPP' : '未连接'} />
+                <StatusRow label="通信" value={online ? transportLabel : '未连接'} />
                 <StatusRow label="水平CH1" value={`${status?.ch1_us ?? '—'} μs`} />
                 <StatusRow label="当前动作" value={currentAction} />
                 <StatusRow label="移动速度" value={`${status?.ramp_us_per_second ?? 100} μs/s`} />

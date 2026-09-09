@@ -1,0 +1,15 @@
+[Unit]
+Description=ESP32 Gun local USB serial bridge
+
+[Service]
+Type=simple
+User=cas
+Group=cas
+SupplementaryGroups=dialout
+WorkingDirectory=/home/cas/esp32-gun-controller
+ExecStart=/usr/bin/python3 /home/cas/esp32-gun-controller/server.py --transport usb_serial --port /dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0 --listen 18765
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

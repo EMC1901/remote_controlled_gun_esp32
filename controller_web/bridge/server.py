@@ -22,8 +22,9 @@ ALLOWED_ORIGINS = {
 
 
 class SppBridge:
-    def __init__(self, port: str) -> None:
+    def __init__(self, port: str, transport: str = "bt_spp") -> None:
         self.port = port
+        self.transport = transport
         self._serial: serial.Serial | None = None
         self._lock = threading.Lock()
 
@@ -31,12 +32,22 @@ class SppBridge:
         if self._serial is not None and self._serial.is_open:
             return self._serial
 
-        self._serial = serial.Serial(
-            port=self.port,
+        connection = serial.Serial(
+            port=None,
             baudrate=115200,
             timeout=2.0,
             write_timeout=2.0,
         )
+        if self.transport == "usb_serial":
+            # Set control lines before opening to reduce ESP32 auto-reset risk.
+            # Some drivers still pulse these lines on open; power the load off
+            # during maintenance and do not rely on this as a safety interlock.
+            connection.dtr = False
+            connection.rts = False
+            connection.exclusive = True
+        connection.port = self.port
+        connection.open()
+        self._serial = connection
         time.sleep(1.2)
         self._serial.reset_input_buffer()
         return self._serial
@@ -60,8 +71,7 @@ class SppBridge:
         if command not in ALLOWED_COMMANDS:
             raise ValueError("命令不在安全白名单中")
 
-        # Position-control firmware returns one immediate line per command and
-        # keeps the last pulse after STOP; it never emits unsolicited lines.
+        # USB boot/diagnostic lines must not be mistaken for protocol replies.
         expected_lines = 1
 
         with self._lock:
@@ -76,7 +86,7 @@ class SppBridge:
                     deadline = time.monotonic() + 3.0
                     while len(responses) < expected_lines and time.monotonic() < deadline:
                         line = spp.readline().decode("utf-8", errors="replace").strip()
-                        if line:
+                        if line and self._matches_response(command, line):
                             responses.append(line)
 
                     if len(responses) != expected_lines:
@@ -89,11 +99,34 @@ class SppBridge:
                         except serial.SerialException:
                             pass
                         self._serial = None
-                    if attempt == 1:
+                    if attempt == 1 or (
+                        self.transport == "usb_serial"
+                        and command not in {"PING", "STATUS", "STOP", "FIRE_OFF"}
+                    ):
                         raise
                     time.sleep(0.6)
 
-        raise RuntimeError("蓝牙事务未完成")
+        raise RuntimeError("设备通信事务未完成")
+
+    @staticmethod
+    def _matches_response(command: str, line: str) -> bool:
+        if line.startswith("ERR "):
+            raise ValueError(f"ESP32拒绝命令：{line}")
+        if command == "PING":
+            return line == "PONG"
+        if command == "STATUS":
+            try:
+                payload = json.loads(line)
+            except ValueError:
+                return False
+            return isinstance(payload, dict) and "control_mode" in payload
+        if command == "STOP":
+            return line.startswith("ACK HOLD ")
+        if command in {"FIRE_ON", "FIRE_OFF"}:
+            return line.startswith(f"ACK {command} ")
+        return line.startswith(f"ACK {command}_ACTIVE ") or line.startswith(
+            f"LIMIT {command} "
+        )
 
 
 class ControlHandler(BaseHTTPRequestHandler):
@@ -150,7 +183,7 @@ class ControlHandler(BaseHTTPRequestHandler):
         except Exception as error:
             self._send_json(
                 HTTPStatus.SERVICE_UNAVAILABLE,
-                {"ok": False, "error": f"蓝牙连接失败：{error}"},
+                {"ok": False, "error": f"设备连接失败：{error}"},
             )
 
     def do_POST(self) -> None:
@@ -184,12 +217,13 @@ class ControlHandler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="ESP32 classic Bluetooth SPP web bridge")
-    parser.add_argument("--port", default="COM4", help="Windows outgoing Bluetooth COM port")
+    parser = argparse.ArgumentParser(description="ESP32 Bluetooth/USB serial web bridge")
+    parser.add_argument("--port", default="COM4", help="Bluetooth COM/RFCOMM or USB serial device")
+    parser.add_argument("--transport", choices=("bt_spp", "usb_serial"), default="bt_spp")
     parser.add_argument("--listen", type=int, default=8765, help="Loopback HTTP port")
     args = parser.parse_args()
 
-    bridge = SppBridge(args.port)
+    bridge = SppBridge(args.port, args.transport)
     ControlHandler.bridge = bridge
     server = ThreadingHTTPServer(("127.0.0.1", args.listen), ControlHandler)
 
@@ -200,7 +234,7 @@ def main() -> None:
     signal.signal(signal.SIGINT, stop_server)
     signal.signal(signal.SIGTERM, stop_server)
 
-    print(f"Local SPP bridge: http://127.0.0.1:{args.listen} -> {args.port}")
+    print(f"Local {args.transport} bridge: http://127.0.0.1:{args.listen} -> {args.port}")
     try:
         server.serve_forever()
     finally:
